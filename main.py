@@ -6,7 +6,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 import time
 
 # TOKEN BOT LU - RESET SETELAH INI YA
-TOKEN_BOT = "8780347773:AAEBNUmWkS4lSpfOlwdRuePgOe4Gev0f5_o"
+TOKEN_BOT = "8780347773:AAGhPuoF1ivhqJeGC-nzDNIrP3L2n3tpcKs"
 
 # LIST 100 SAHAM: LQ45 + IDX30 + SAHAM KONGLO GORENGAN
 LIST_SAHAM = [
