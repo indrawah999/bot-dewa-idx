@@ -7,6 +7,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 # TOKEN LANGSUNG HARDCODE - GANTI NANTI KALO UDAH JALAN
 TOKEN_BOT = "8780347773:AAGhPuoF1ivhqJeGC-nzDNIrP3L2n3tpcKs"
 
+# 150 SAHAM UNGGULAN + KONGLO + GORENGAN TRENDING
 SAHAM_UNGGULAN = [
     # Blue Chip LQ45
     "BBCA.JK", "BBRI.JK", "BMRI.JK", "TLKM.JK", "ASII.JK", "UNVR.JK", "ICBP.JK", "INDF.JK", "KLBF.JK", "GGRM.JK",
@@ -19,12 +20,18 @@ SAHAM_UNGGULAN = [
     "BABP.JK", "BGTG.JK", "BCIC.JK", "BKSW.JK", "BSWD.JK", "BVIC.JK", "DNAR.JK", "INPC.JK", "MCOR.JK", "PNBS.JK",
     "SDRA.JK", "AMAR.JK", "ARTO.JK", "BBMD.JK", "BBSI.JK", "BINA.JK", "BMAS.JK", "BSIM.JK", "BUKK.JK", "CEKA.JK",
     "CLEO.JK", "CO.JK", "DLTA.JK", "GOTO.JK", "BUKA.JK", "BIRD.JK", "BIPI.JK", "ELSA.JK", "ESSA.JK", "HRUM.JK",
-    
-    # SAHAM KONGLO GORENGAN TAMBAHAN
+
+    # SAHAM KONGLO GORENGAN
     "PTRO.JK", "BUMI.JK", "BRMS.JK", "DEWA.JK", "ENRG.JK", "PK.JK", "DOID.JK", "INDY.JK", "ABMM.JK", "BYAN.JK",
     "CUAN.JK", "TPIA.JK", "BREN.JK", "CDIA.JK", "PANI.JK", "CBDK.JK", "PNLF.JK", "BRPT.JK", "SRTG.JK", "MTLA.JK",
-    "MAPI.JK", "MAPA.JK", "AMRT.JK", "ACES.JK", "FILM.JK", "MDKA.JK", "MBMA.JK", "AMMN.JK", "NCKL.JK", "NICL.JK"
+    "MAPI.JK", "MAPA.JK", "AMRT.JK", "ACES.JK", "FILM.JK", "MDKA.JK", "MBMA.JK", "AMMN.JK", "NCKL.JK", "NICL.JK",
+
+    # SAHAM TRENDING + GORENGAN LAIN
+    "KOTA.JK", "MINA.JK", "ASPR.JK", "BCIP.JK", "PADI.JK", "BUVA.JK", "PIPA.JK", "LABA.JK", "SUNI.JK", "TRON.JK",
+    "VKTR.JK", "WIFI.JK", "RAJA.JK", "GULA.JK", "SMIL.JK", "KJEN.JK", "ATLA.JK", "CBRE.JK", "BULL.JK", "KRYA.JK",
+    "KREN.JK", "WINS.JK", "SGER.JK", "TELE.JK", "TGRA.JK", "CARE.JK", "ERAA.JK", "WIRG.JK", "BIPI.JK", "MIRA.JK"
 ]
+
 def hitung_rsi(series, periode=14):
     delta = series.diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=periode).mean()
@@ -75,7 +82,7 @@ def analisa_saham(ticker, mode="praara"):
         skor = 0
         alasan = []
 
-        # 1. PRAARA - All Round AKUMULASI
+        # 1. PRAARA - All Round AKUMULASI SEHAT
         if mode == "praara":
             if harga > ma20 > ma50: skor += 2; alasan.append("Uptrend MA20>MA50")
             if rsi < 30: skor += 2; alasan.append("RSI Oversold")
@@ -96,16 +103,17 @@ def analisa_saham(ticker, mode="praara"):
         elif mode == "daytrade":
             if harga > harga_kemarin * 1.01: skor += 2; alasan.append("Naik >1% Hari Ini")
             if vol > vol_kemarin * 1.5: skor += 2; alasan.append("Volume Naik 50%")
-            if rsi > 55 and rsi < 70: skor += 1; alasan.append("RSI Momentum")
+            if rsi > 55 and rsi < 85: skor += 1; alasan.append("RSI Momentum")
             if harga > ma5: skor += 1; alasan.append("Harga > MA5")
             batas_skor = 3
 
         # 4. SCALPING - BB Squeeze + Volume
         elif mode == "scalping":
             bb_width = (bb_upper - bb_lower) / df['MA20'].iloc[-1]
-            if bb_width < 0.05: skor += 2; alasan.append("BB Squeeze Ketat")
+            if bb_width < 0.05: skor += 1; alasan.append("BB Squeeze")
             if harga > bb_upper: skor += 2; alasan.append("Breakout BB Atas")
             if vol > avg_vol * 2: skor += 2; alasan.append("Volume 2x Rata2")
+            if rsi > 60: skor += 1; alasan.append("RSI Kuat")
             batas_skor = 3
 
         # 5. BPJS - Bandar Pelan-pelan Jajan Saham = AKUMULASI SEPI
@@ -116,13 +124,23 @@ def analisa_saham(ticker, mode="praara"):
             if macd_val > signal_val: skor += 1; alasan.append("MACD Bullish Diam2")
             batas_skor = 3
 
+        # 6. TREND - Gabungan Daytrade + Scalping buat saham terbang
+        elif mode == "trend":
+            if harga > harga_kemarin * 1.03: skor += 3; alasan.append("Naik >3% GILA")
+            elif harga > harga_kemarin * 1.01: skor += 2; alasan.append("Naik >1% Hari Ini")
+            if vol > avg_vol * 2: skor += 2; alasan.append("Volume 2x Rata2")
+            if harga > bb_upper: skor += 2; alasan.append("Jebol BB Upper")
+            if rsi > 70: skor += 1; alasan.append("RSI Overbought Parah")
+            batas_skor = 4
+
         if skor >= batas_skor:
             return {
                 "ticker": ticker.replace(".JK", ""),
                 "harga": harga,
                 "skor": skor,
                 "alasan": ", ".join(alasan),
-                "rsi": round(rsi, 1)
+                "rsi": round(rsi, 1),
+                "perubahan": round((harga/harga_kemarin-1)*100, 2)
             }
         return None
     except:
@@ -130,20 +148,21 @@ def analisa_saham(ticker, mode="praara"):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🔥 Bot Dewa IDX v1.3.2 Konglo Aktif!\n\n"
-        "Command Screener 100 Saham:\n"
-        "/praara - All Round Akumulasi\n"
+        "🔥 Bot Dewa IDX v1.3.3 Konglo Aktif!\n\n"
+        "Command Screener 150 Saham:\n"
+        "/praara - Akumulasi Sehat\n"
         "/swing - Swing MA20 + RSI\n"
+        "/bpjs - Bandar Jajan Sepi\n"
         "/daytrade - Momentum Intraday\n"
         "/scalping - Breakout BB + Volume\n"
-        "/bpjs - Bandar Pelan-pelan Jajan Saham\n\n"
+        "/trend - SAHAM LAGI TERBANG\n\n"
         "Command Analisa:\n"
         "/harga KODE - Cek harga, contoh: /harga BBCA\n"
-        "/sinyal KODE - Analisa lengkap 1 saham"
+        "/sinyal KODE - Analisa momentum 1 saham"
     )
 
 async def screener_generic(update: Update, context: ContextTypes.DEFAULT_TYPE, mode: str, judul: str):
-    await update.message.reply_text(f"🚀 Screening {judul}... Ini 30-60 detik bro, sabar...")
+    await update.message.reply_text(f"🚀 Screening {judul} 150 saham... Sabar 45-90 detik bro...")
     hasil_sinyal = []
     for ticker in SAHAM_UNGGULAN:
         res = analisa_saham(ticker, mode)
@@ -157,12 +176,12 @@ async def screener_generic(update: Update, context: ContextTypes.DEFAULT_TYPE, m
     hasil_sinyal = sorted(hasil_sinyal, key=lambda x: x['skor'], reverse=True)[:5]
     teks = f"🔥 TOP 5 {judul.upper()} 🔥\n\n"
     for i, s in enumerate(hasil_sinyal, 1):
-        teks += f"{i}. {s['ticker']} - Rp {s['harga']:,.0f}\n Skor: {s['skor']} | RSI: {s['rsi']}\n {s['alasan']}\n\n"
+        teks += f"{i}. {s['ticker']} - Rp {s['harga']:,.0f} ({s['perubahan']}%)\n Skor: {s['skor']} | RSI: {s['rsi']}\n {s['alasan']}\n\n"
     teks += "Disclaimer: Bukan ajakan beli. DYOR!"
     await update.message.reply_text(teks)
 
 async def praara(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await screener_generic(update, context, "praara", "All Round Akumulasi")
+    await screener_generic(update, context, "praara", "Akumulasi Sehat")
 
 async def swing(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await screener_generic(update, context, "swing", "Swing MA20+RSI")
@@ -175,6 +194,9 @@ async def scalping(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def bpjs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await screener_generic(update, context, "bpjs", "BPJS - Bandar Jajan")
+
+async def trend(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await screener_generic(update, context, "trend", "Saham Lagi Terbang")
 
 async def harga(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -198,15 +220,16 @@ async def sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     kode = context.args[0].upper() + ".JK"
     await update.message.reply_text(f"Sedang analisa {kode.replace('.JK','')}... Sabar 3 detik")
-    hasil = analisa_saham(kode, "praara")
+    # GANTI KE DAYTRADE BIAR PTRO BRPT KEBACA
+    hasil = analisa_saham(kode, "daytrade")
     if hasil:
-        teks = f"📈 SINYAL {hasil['ticker']}\nHarga: Rp {hasil['harga']:,.0f}\nSkor: {hasil['skor']}/7\nRSI: {hasil['rsi']}\nAlasan: {hasil['alasan']}"
+        teks = f"📈 SINYAL {hasil['ticker']}\nHarga: Rp {hasil['harga']:,.0f} ({hasil['perubahan']}%)\nSkor: {hasil['skor']}\nRSI: {hasil['rsi']}\nAlasan: {hasil['alasan']}"
     else:
-        teks = f"Nggak ada sinyal kuat buat {kode.replace('.JK','')} sekarang. Coba /praara"
+        teks = f"Nggak ada sinyal momentum buat {kode.replace('.JK','')} sekarang. Coba /trend atau /praara"
     await update.message.reply_text(teks)
 
 if __name__ == '__main__':
-    print("Bot Dewa IDX v1.3.2 Konglo jalan...")
+    print("Bot Dewa IDX v1.3.3 Konglo jalan...")
     app = ApplicationBuilder().token(TOKEN_BOT).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -217,5 +240,6 @@ if __name__ == '__main__':
     app.add_handler(CommandHandler("daytrade", daytrade))
     app.add_handler(CommandHandler("scalping", scalping))
     app.add_handler(CommandHandler("bpjs", bpjs))
+    app.add_handler(CommandHandler("trend", trend))
 
     app.run_polling()
