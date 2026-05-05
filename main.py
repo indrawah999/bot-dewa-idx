@@ -8,6 +8,12 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 # TOKEN AMBIL DARI RAILWAY VARIABLES - JANGAN TARUH DI SINI
 TOKEN_BOT = os.environ.get('8780347773:AAGhPuoF1ivhqJeGC-nzDNIrP3L2n3tpcKs')
 
+# DEBUGGING: Cek token kebaca apa nggak
+if not TOKEN_BOT:
+    print("ERROR: TOKEN_BOT KOSONG. Cek Railway Variables!")
+else:
+    print(f"TOKEN_BOT kebaca. Panjang: {len(TOKEN_BOT)} karakter")
+
 # 100 SAHAM UNGGULAN IDX - WAJIB PAKE.JK BUAT YFINANCE
 SAHAM_UNGGULAN = [
     "BBCA.JK", "BBRI.JK", "BMRI.JK", "TLKM.JK", "ASII.JK", "UNVR.JK", "ICBP.JK", "INDF.JK", "KLBF.JK", "GGRM.JK",
