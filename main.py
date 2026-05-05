@@ -8,6 +8,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 TOKEN_BOT = "8780347773:AAGhPuoF1ivhqJeGC-nzDNIrP3L2n3tpcKs"
 
 SAHAM_UNGGULAN = [
+    # Blue Chip LQ45
     "BBCA.JK", "BBRI.JK", "BMRI.JK", "TLKM.JK", "ASII.JK", "UNVR.JK", "ICBP.JK", "INDF.JK", "KLBF.JK", "GGRM.JK",
     "HMSP.JK", "INCO.JK", "ANTM.JK", "PTBA.JK", "ADRO.JK", "ITMG.JK", "PGAS.JK", "MEDC.JK", "AKRA.JK", "MNCN.JK",
     "SCMA.JK", "EMTK.JK", "TOWR.JK", "TBIG.JK", "EXCL.JK", "ISAT.JK", "FREN.JK", "JSMR.JK", "WIKA.JK", "PTPP.JK",
@@ -17,9 +18,13 @@ SAHAM_UNGGULAN = [
     "PNBN.JK", "BNGA.JK", "BNLI.JK", "NISP.JK", "BBTN.JK", "BDMN.JK", "AGRO.JK", "BEKS.JK", "MAYA.JK", "BACA.JK",
     "BABP.JK", "BGTG.JK", "BCIC.JK", "BKSW.JK", "BSWD.JK", "BVIC.JK", "DNAR.JK", "INPC.JK", "MCOR.JK", "PNBS.JK",
     "SDRA.JK", "AMAR.JK", "ARTO.JK", "BBMD.JK", "BBSI.JK", "BINA.JK", "BMAS.JK", "BSIM.JK", "BUKK.JK", "CEKA.JK",
-    "CLEO.JK", "CO.JK", "DLTA.JK", "GOTO.JK", "BUKA.JK", "BIRD.JK", "BIPI.JK", "ELSA.JK", "ESSA.JK", "HRUM.JK"
+    "CLEO.JK", "CO.JK", "DLTA.JK", "GOTO.JK", "BUKA.JK", "BIRD.JK", "BIPI.JK", "ELSA.JK", "ESSA.JK", "HRUM.JK",
+    
+    # SAHAM KONGLO GORENGAN TAMBAHAN
+    "PTRO.JK", "BUMI.JK", "BRMS.JK", "DEWA.JK", "ENRG.JK", "PK.JK", "DOID.JK", "INDY.JK", "ABMM.JK", "BYAN.JK",
+    "CUAN.JK", "TPIA.JK", "BREN.JK", "CDIA.JK", "PANI.JK", "CBDK.JK", "PNLF.JK", "BRPT.JK", "SRTG.JK", "MTLA.JK",
+    "MAPI.JK", "MAPA.JK", "AMRT.JK", "ACES.JK", "FILM.JK", "MDKA.JK", "MBMA.JK", "AMMN.JK", "NCKL.JK", "NICL.JK"
 ]
-
 def hitung_rsi(series, periode=14):
     delta = series.diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=periode).mean()
