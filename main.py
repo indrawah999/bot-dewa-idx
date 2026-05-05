@@ -1,18 +1,11 @@
-import os
 import yfinance as yf
 import pandas as pd
 import numpy as np
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# TOKEN AMBIL DARI RAILWAY VARIABLES - JANGAN TARUH DI SINI
-TOKEN_BOT = os.environ.get('8780347773:AAGhPuoF1ivhqJeGC-nzDNIrP3L2n3tpcKs')
-
-# DEBUGGING: Cek token kebaca apa nggak
-if not TOKEN_BOT:
-    print("ERROR: TOKEN_BOT KOSONG. Cek Railway Variables!")
-else:
-    print(f"TOKEN_BOT kebaca. Panjang: {len(TOKEN_BOT)} karakter")
+# TOKEN LANGSUNG HARDCODE - GANTI NANTI KALO UDAH JALAN
+TOKEN_BOT = "8780347773:AAGhPuoF1ivhqJeGC-nzDNIrP3L2n3tpcKs"
 
 # 100 SAHAM UNGGULAN IDX - WAJIB PAKE.JK BUAT YFINANCE
 SAHAM_UNGGULAN = [
@@ -28,129 +21,140 @@ SAHAM_UNGGULAN = [
     "CLEO.JK", "CO.JK", "DLTA.JK", "GOTO.JK", "BUKA.JK", "BIRD.JK", "BIPI.JK", "ELSA.JK", "ESSA.JK", "HRUM.JK"
 ]
 
-def hitung_rsi(data, period=14):
-    delta = data.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+def hitung_rsi(series, periode=14):
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=periode).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=periode).mean()
     rs = gain / loss
-    return 100 - (100 / (1 + rs))
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
 
-def bersih_kode(kode):
-    """Hapus.JK biar tampilan bersih"""
-    return kode.replace('.JK', '')
+def hitung_macd(series, fast=12, slow=26, signal=9):
+    ema_fast = series.ewm(span=fast, adjust=False).mean()
+    ema_slow = series.ewm(span=slow, adjust=False).mean()
+    macd = ema_fast - ema_slow
+    signal_line = macd.ewm(span=signal, adjust=False).mean()
+    histogram = macd - signal_line
+    return macd, signal_line, histogram
+
+def analisa_saham(ticker):
+    try:
+        saham = yf.Ticker(ticker)
+        df = saham.history(period="3mo")
+        if df.empty or len(df) < 30:
+            return None
+
+        df['MA20'] = df['Close'].rolling(window=20).mean()
+        df['MA50'] = df['Close'].rolling(window=50).mean()
+        df['RSI'] = hitung_rsi(df['Close'])
+        macd, signal, hist = hitung_macd(df['Close'])
+        df['MACD'] = macd
+        df['Signal'] = signal
+
+        harga = df['Close'].iloc[-1]
+        ma20 = df['MA20'].iloc[-1]
+        ma50 = df['MA50'].iloc[-1]
+        rsi = df['RSI'].iloc[-1]
+        macd_val = df['MACD'].iloc[-1]
+        signal_val = df['Signal'].iloc[-1]
+        vol = df['Volume'].iloc[-1]
+        avg_vol = df['Volume'].rolling(window=20).mean().iloc[-1]
+
+        skor = 0
+        alasan = []
+
+        if harga > ma20 > ma50:
+            skor += 2
+            alasan.append("Uptrend MA20>MA50")
+        if rsi < 30:
+            skor += 2
+            alasan.append("RSI Oversold")
+        elif rsi > 50 and rsi < 70:
+            skor += 1
+            alasan.append("RSI Kuat")
+        if macd_val > signal_val:
+            skor += 2
+            alasan.append("MACD Bullish Cross")
+        if vol > avg_vol * 1.5:
+            skor += 1
+            alasan.append("Volume Meledak")
+
+        if skor >= 4:
+            return {
+                "ticker": ticker.replace(".JK", ""),
+                "harga": harga,
+                "skor": skor,
+                "alasan": ", ".join(alasan),
+                "rsi": round(rsi, 1)
+            }
+        return None
+    except:
+        return None
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    pesan = """Bot Dewa IDX v1.3.2 - Konglo Edition 🔥
-
-Scan 100 Saham:
-/screener - Oversold RSI<30
-/bsjp - Akumulasi Bandar
-/scalping - Sinyal Cepat
-/swing - Golden Cross
-/daytrade - Breakout
-/praara - Potensi ARA Besok 🔥
-/harga BBCA - Cek harga
-
-Delay 15m. DYOR."""
-    await update.message.reply_text(pesan)
+    await update.message.reply_text(
+        "🔥 Bot Dewa IDX v1.3.2 Konglo Aktif!\n\n"
+        "Command:\n"
+        "/praara - Screener 100 saham unggulan\n"
+        "/harga KODE - Cek harga saham, contoh: /harga BBCA\n"
+        "/sinyal KODE - Analisa lengkap 1 saham"
+    )
 
 async def harga(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Pake format: /harga BBCA")
+        return
+    kode = context.args[0].upper() + ".JK"
     try:
-        kode_input = context.args[0].upper()
-        # User boleh ketik BBCA atau BBCA.JK, kita tambahin.JK otomatis
-        if not kode_input.endswith('.JK'):
-            kode_yf = kode_input + '.JK'
-        else:
-            kode_yf = kode_input
-
-        ticker = yf.Ticker(kode_yf)
-        info = ticker.info
-        hist = ticker.history(period="2d")
-        if len(hist) < 2:
-            await update.message.reply_text("Data saham nggak ketemu bro")
+        saham = yf.Ticker(kode)
+        data = saham.history(period="1d")
+        if data.empty:
+            await update.message.reply_text(f"Saham {kode.replace('.JK','')} nggak ketemu bro")
             return
-
-        harga_now = hist['Close'].iloc[-1]
-        harga_prev = hist['Close'].iloc[-2]
-        change = ((harga_now - harga_prev) / harga_prev) * 100
-        volume = hist['Volume'].iloc[-1]
-
-        # Pake bersih_kode() biar output nggak ada.JK
-        nama_saham = bersih_kode(kode_yf)
-        pesan = f"*{info.get('longName', nama_saham)}*\n"
-        pesan += f"Kode: {nama_saham}\n"
-        pesan += f"Harga: Rp{harga_now:,.0f}\n"
-        pesan += f"Change: {change:+.2f}%\n"
-        pesan += f"Volume: {volume:,.0f}\n"
-        pesan += f"Delay 15m"
-        await update.message.reply_text(pesan, parse_mode='Markdown')
+        harga = data['Close'].iloc[-1]
+        await update.message.reply_text(f"Harga {kode.replace('.JK','')}: Rp {harga:,.0f}")
     except:
-        await update.message.reply_text("Format salah. Contoh: /harga BBCA")
+        await update.message.reply_text("Error ambil data. Coba lagi")
 
-async def screener(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🔍 Scan Oversold RSI<30...")
-    hasil = []
-    for kode in SAHAM_UNGGULAN[:100]:
-        try:
-            data = yf.Ticker(kode).history(period="1mo")
-            rsi = hitung_rsi(data['Close']).iloc[-1]
-            if rsi < 30:
-                hasil.append(f"📉 {bersih_kode(kode)} - RSI: {rsi:.1f}")
-            if len(hasil) >= 10: break
-        except: continue
-    pesan = "🔥 **SAHAM OVERSOLD RSI<30**\n\n" + "\n".join(hasil) if hasil else "Nihil bosku."
-    await update.message.reply_text(pesan, parse_mode='Markdown')
-
-async def pra_ara(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("⚡ Scan 100 Saham Pra-ARA...\nCari +15% sd +24% + Volume Jebol")
-    hasil = []
-    for kode in SAHAM_UNGGULAN[:100]:
-        try:
-            ticker = yf.Ticker(kode)
-            hist = ticker.history(period="25d")
-            if len(hist) < 21: continue
-
-            harga_now = hist['Close'].iloc[-1]
-            harga_prev = hist['Close'].iloc[-2]
-            change = ((harga_now - harga_prev) / harga_prev) * 100
-            vol_now = hist['Volume'].iloc[-1]
-            vol_avg20 = hist['Volume'].iloc[-21:-1].mean()
-
-            # Syarat Pra-ARA: Naik 15-24.5% + Volume > 3x rata2
-            if 15 <= change < 24.5 and vol_now > vol_avg20 * 3 and vol_avg20 > 0:
-                hasil.append(f"🔥 {bersih_kode(kode)}: +{change:.1f}% | Vol {vol_now/vol_avg20:.1f}x")
-
-            if len(hasil) >= 10: break
-        except: continue
-
+async def sinyal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("Pake format: /sinyal BBCA")
+        return
+    kode = context.args[0].upper() + ".JK"
+    await update.message.reply_text(f"Sedang analisa {kode.replace('.JK','')}... Sabar 3 detik")
+    hasil = analisa_saham(kode)
     if hasil:
-        pesan = "🚀 **SINYAL PRA-ARA TERDETEKSI**\nDelay 15m\n\n" + "\n".join(hasil) + "\n\n*Besok potensi ARA. DYOR.*"
+        teks = f"📈 SINYAL {hasil['ticker']}\nHarga: Rp {hasil['harga']:,.0f}\nSkor: {hasil['skor']}/7\nRSI: {hasil['rsi']}\nAlasan: {hasil['alasan']}"
     else:
-        pesan = "😴 Belum ada saham Pra-ARA hari ini.\nCoba cek lagi jam 15:30 WIB."
-    await update.message.reply_text(pesan, parse_mode='Markdown')
+        teks = f"Nggak ada sinyal kuat buat {kode.replace('.JK','')} sekarang. Coba /praara buat cari yg lain"
+    await update.message.reply_text(teks)
 
-# Fungsi lain biar nggak error
-async def bsjp(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Fitur BSJP coming soon")
+async def praara(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("🚀 Screening 100 Saham Unggulan IDX... Ini 30-60 detik bro, sabar...")
+    hasil_sinyal = []
+    for ticker in SAHAM_UNGGULAN:
+        res = analisa_saham(ticker)
+        if res:
+            hasil_sinyal.append(res)
 
-async def scalping(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Fitur Scalping coming soon")
+    if not hasil_sinyal:
+        await update.message.reply_text("Zonk bro 😭 Nggak ada saham yg lolos screener hari ini. Market lagi jelek.")
+        return
 
-async def swing(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Fitur Swing coming soon")
+    hasil_sinyal = sorted(hasil_sinyal, key=lambda x: x['skor'], reverse=True)[:5]
+    teks = "🔥 TOP 5 SAHAM SINYAL KUAT HARI INI 🔥\n\n"
+    for i, s in enumerate(hasil_sinyal, 1):
+        teks += f"{i}. {s['ticker']} - Rp {s['harga']:,.0f}\n Skor: {s['skor']}/7 | RSI: {s['rsi']}\n {s['alasan']}\n\n"
+    teks += "Disclaimer: Bukan ajakan beli. DYOR!"
+    await update.message.reply_text(teks)
 
-async def daytrade(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Fitur Daytrade coming soon")
+if __name__ == '__main__':
+    print("Bot Dewa IDX v1.3.2 Konglo jalan...")
+    app = ApplicationBuilder().token(TOKEN_BOT).build()
 
-app = ApplicationBuilder().token(TOKEN_BOT).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("harga", harga))
-app.add_handler(CommandHandler("screener", screener))
-app.add_handler(CommandHandler("praara", pra_ara))
-app.add_handler(CommandHandler("bsjp", bsjp))
-app.add_handler(CommandHandler("scalping", scalping))
-app.add_handler(CommandHandler("swing", swing))
-app.add_handler(CommandHandler("daytrade", daytrade))
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("harga", harga))
+    app.add_handler(CommandHandler("sinyal", sinyal))
+    app.add_handler(CommandHandler("praara", praara))
 
-print("Bot Dewa IDX v1.3.2 Konglo jalan...")
-app.run_polling()
+    app.run_polling()
